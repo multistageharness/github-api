@@ -1,0 +1,197 @@
+{
+  "file": "r12-config",
+  "description": "R12 — every option has a documented default and a stated unit, invalid configuration fails at construction rather than at the first request, and the package has a real off switch that still tracks state.",
+  "cases": [
+    {
+      "id": "R12-001",
+      "requirements": ["R12"],
+      "title": "Documented defaults are the defaults",
+      "kind": "config-defaults",
+      "input": { "options": {} },
+      "expect": {
+        "resolved": {
+          "enabled": true,
+          "minIntervalMs": 0,
+          "adaptivePacing": true,
+          "adaptiveThreshold": 0.2,
+          "reserve": 1,
+          "maxPacingDelayMs": 5000,
+          "maxConcurrent": 8,
+          "maxWaitMs": 60000,
+          "waitPaddingMs": 1000,
+          "fallbackWaitMs": 1000,
+          "secondaryFallbackWaitMs": 60000,
+          "maxRetries": 3,
+          "retryNonIdempotent": false,
+          "nearExhaustionThreshold": 100,
+          "secondaryConcurrencyFloor": 1,
+          "secondaryEscalationFactor": 2,
+          "secondaryRecoveryAfter": 10
+        }
+      }
+    },
+    {
+      "id": "R12-002",
+      "requirements": ["R12", "R9"],
+      "title": "The backoff schedule has documented defaults too",
+      "kind": "config-defaults",
+      "input": { "options": {} },
+      "expect": { "resolvedBackoff": { "baseMs": 1000, "factor": 2, "maxMs": 30000, "jitter": "equal" } }
+    },
+    {
+      "id": "R12-003",
+      "requirements": ["R12"],
+      "title": "A partial backoff override keeps the remaining defaults",
+      "kind": "config-defaults",
+      "input": { "options": { "backoff": { "baseMs": 250 } } },
+      "expect": { "resolvedBackoff": { "baseMs": 250, "factor": 2, "maxMs": 30000, "jitter": "equal" } }
+    },
+    {
+      "id": "R12-004",
+      "requirements": ["R12", "R8"],
+      "title": "A concurrency cap of zero is rejected at construction",
+      "kind": "config-invalid",
+      "input": { "options": { "maxConcurrent": 0 } },
+      "expect": { "throws": true }
+    },
+    {
+      "id": "R12-005",
+      "requirements": ["R12", "R7"],
+      "title": "A threshold outside 0..1 is rejected at construction",
+      "kind": "config-invalid",
+      "input": { "options": { "adaptiveThreshold": 1.5 } },
+      "expect": { "throws": true }
+    },
+    {
+      "id": "R12-006",
+      "requirements": ["R12", "R6"],
+      "title": "A wait ceiling of zero is rejected — it would make every limit unrecoverable",
+      "kind": "config-invalid",
+      "input": { "options": { "maxWaitMs": 0 } },
+      "expect": { "throws": true }
+    },
+    {
+      "id": "R12-007",
+      "requirements": ["R12", "R9"],
+      "title": "An unknown jitter mode is rejected rather than silently ignored",
+      "kind": "config-invalid",
+      "input": { "options": { "backoff": { "jitter": "wild" } } },
+      "expect": { "throws": true }
+    },
+    {
+      "id": "R12-008",
+      "requirements": ["R12", "R7"],
+      "title": "A negative interval is rejected",
+      "kind": "config-invalid",
+      "input": { "options": { "minIntervalMs": -1 } },
+      "expect": { "throws": true }
+    },
+    {
+      "id": "R12-009",
+      "requirements": ["R12", "R8"],
+      "title": "A secondary floor above the cap is contradictory and is rejected",
+      "kind": "config-invalid",
+      "input": { "options": { "maxConcurrent": 2, "secondaryConcurrencyFloor": 4 } },
+      "expect": { "throws": true }
+    },
+    {
+      "id": "R12-010",
+      "requirements": ["R12", "R1"],
+      "title": "Disabled: no delay and no waiting, but state is still tracked",
+      "kind": "scenario",
+      "input": {
+        "config": { "enabled": false, "minIntervalMs": 5000, "maxRetries": 3 },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "repeat": 2,
+        "responses": [
+          {
+            "status": 200,
+            "headers": { "x-ratelimit-remaining": "4999", "x-ratelimit-reset": "3600", "x-ratelimit-limit": "5000" }
+          },
+          {
+            "status": 200,
+            "headers": { "x-ratelimit-remaining": "4998", "x-ratelimit-reset": "3600", "x-ratelimit-limit": "5000" }
+          }
+        ]
+      },
+      "expect": {
+        "outcome": "success",
+        "attempts": 2,
+        "sleeps": [],
+        "finalStatus": { "core": { "remaining": 4998, "limit": 5000 } }
+      }
+    },
+    {
+      "id": "R12-011",
+      "requirements": ["R12"],
+      "title": "Disabled: a rate-limited response is returned as-is rather than waited out",
+      "kind": "scenario",
+      "input": {
+        "config": { "enabled": false, "maxRetries": 3 },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          {
+            "status": 403,
+            "headers": { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "3600", "x-ratelimit-limit": "5000" }
+          }
+        ]
+      },
+      "expect": {
+        "outcome": "success",
+        "attempts": 1,
+        "sleeps": [],
+        "finalStatus": { "core": { "remaining": 0 } }
+      }
+    },
+    {
+      "id": "R12-012",
+      "requirements": ["R12"],
+      "title": "Retries can be switched off entirely",
+      "kind": "config-defaults",
+      "input": { "options": { "maxRetries": 0 } },
+      "expect": { "resolved": { "maxRetries": 0 } }
+    },
+    {
+      "id": "R12-013",
+      "requirements": ["R12"],
+      "title": "A misspelt option is rejected rather than silently replaced by its default",
+      "kind": "config-invalid",
+      "input": { "options": { "maxWaitMS": 1 } },
+      "expect": { "throws": true }
+    },
+    {
+      "id": "R12-014",
+      "requirements": ["R12", "R5"],
+      "title": "An escalation factor below one would shorten repeated waits and is rejected",
+      "kind": "config-invalid",
+      "input": { "options": { "secondaryEscalationFactor": 0.5 } },
+      "expect": { "throws": true }
+    },
+    {
+      "id": "R12-015",
+      "requirements": ["R12", "R8"],
+      "title": "A fractional concurrency cap is rejected",
+      "kind": "config-invalid",
+      "input": { "options": { "maxConcurrent": 2.5 } },
+      "expect": { "throws": true }
+    },
+    {
+      "id": "R12-016",
+      "requirements": ["R12", "R9"],
+      "title": "A fractional retry count is rejected",
+      "kind": "config-invalid",
+      "input": { "options": { "maxRetries": 1.5 } },
+      "expect": { "throws": true }
+    },
+    {
+      "id": "R12-017",
+      "requirements": ["R12", "R9"],
+      "title": "A misspelt backoff option is rejected too",
+      "kind": "config-invalid",
+      "input": { "options": { "backoff": { "baseMS": 1 } } },
+      "expect": { "throws": true }
+    }
+  ]
+}

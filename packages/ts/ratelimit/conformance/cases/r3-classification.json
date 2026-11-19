@@ -1,0 +1,152 @@
+{
+  "file": "r3-classification",
+  "description": "R3 — an exhausted primary limit is recognized on BOTH signals GitHub uses (403 with remaining 0, and 429), and a 403 that is not a limit is not retried as one.",
+  "cases": [
+    {
+      "id": "R3-001",
+      "requirements": ["R3"],
+      "title": "403 with x-ratelimit-remaining: 0 is a primary rate limit",
+      "kind": "classify",
+      "input": {
+        "status": 403,
+        "headers": { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "3600", "x-ratelimit-limit": "5000" },
+        "data": null,
+        "nowMs": 0,
+        "resourceHint": "core"
+      },
+      "expect": {
+        "kind": "primary",
+        "isRateLimit": true,
+        "resource": "core",
+        "retryAfterMs": null,
+        "resetAtMs": 3600000
+      }
+    },
+    {
+      "id": "R3-002",
+      "requirements": ["R3"],
+      "title": "429 with x-ratelimit-remaining: 0 is a primary rate limit",
+      "kind": "classify",
+      "input": {
+        "status": 429,
+        "headers": { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "3600" },
+        "data": null,
+        "nowMs": 0,
+        "resourceHint": "core"
+      },
+      "expect": { "kind": "primary", "isRateLimit": true, "resetAtMs": 3600000 }
+    },
+    {
+      "id": "R3-003",
+      "requirements": ["R3", "R5"],
+      "title": "A bare 429 is a rate limit — the signal reactions handles and activity misses",
+      "kind": "classify",
+      "input": { "status": 429, "headers": {}, "data": null, "nowMs": 0, "resourceHint": "core" },
+      "expect": { "kind": "secondary", "isRateLimit": true, "retryAfterMs": null, "resetAtMs": null }
+    },
+    {
+      "id": "R3-004",
+      "requirements": ["R3"],
+      "title": "403 with budget remaining is a permission failure, not a rate limit",
+      "kind": "classify",
+      "input": {
+        "status": 403,
+        "headers": { "x-ratelimit-remaining": "4999", "x-ratelimit-reset": "3600" },
+        "data": { "message": "Resource not accessible by integration" },
+        "nowMs": 0,
+        "resourceHint": "core"
+      },
+      "expect": { "kind": "none", "isRateLimit": false }
+    },
+    {
+      "id": "R3-005",
+      "requirements": ["R3"],
+      "title": "403 with no rate-limit headers at all is a permission failure",
+      "kind": "classify",
+      "input": {
+        "status": 403,
+        "headers": {},
+        "data": { "message": "Must have admin rights to Repository." },
+        "nowMs": 0,
+        "resourceHint": "core"
+      },
+      "expect": { "kind": "none", "isRateLimit": false }
+    },
+    {
+      "id": "R3-006",
+      "requirements": ["R3"],
+      "title": "A successful response is not a rate limit even with a spent budget",
+      "kind": "classify",
+      "input": {
+        "status": 200,
+        "headers": { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "3600" },
+        "data": null,
+        "nowMs": 0,
+        "resourceHint": "core"
+      },
+      "expect": { "kind": "none", "isRateLimit": false }
+    },
+    {
+      "id": "R3-007",
+      "requirements": ["R3"],
+      "title": "404 is not a rate limit",
+      "kind": "classify",
+      "input": { "status": 404, "headers": {}, "data": null, "nowMs": 0, "resourceHint": "core" },
+      "expect": { "kind": "none", "isRateLimit": false }
+    },
+    {
+      "id": "R3-008",
+      "requirements": ["R3"],
+      "title": "500 is not a rate limit",
+      "kind": "classify",
+      "input": { "status": 500, "headers": {}, "data": null, "nowMs": 0, "resourceHint": "core" },
+      "expect": { "kind": "none", "isRateLimit": false }
+    },
+    {
+      "id": "R3-009",
+      "requirements": ["R3", "R6", "R9"],
+      "title": "A 403 rate limit is waited out and the request replayed — the case reactions misses today",
+      "kind": "scenario",
+      "input": {
+        "config": { "maxRetries": 1, "maxWaitMs": 600000, "backoff": { "jitter": "none", "baseMs": 0 } },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          {
+            "status": 403,
+            "headers": { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "60", "x-ratelimit-limit": "5000" }
+          },
+          {
+            "status": 200,
+            "headers": { "x-ratelimit-remaining": "4999", "x-ratelimit-reset": "3660", "x-ratelimit-limit": "5000" }
+          }
+        ]
+      },
+      "expect": {
+        "outcome": "success",
+        "attempts": 2,
+        "sleeps": [61000],
+        "events": ["limit", "wait", "retry"],
+        "finalStatus": { "core": { "remaining": 4999 } }
+      }
+    },
+    {
+      "id": "R3-010",
+      "requirements": ["R3", "R11"],
+      "title": "A 403 permission failure is surfaced unchanged, never as a rate limit",
+      "kind": "scenario",
+      "input": {
+        "config": { "maxRetries": 3, "maxWaitMs": 600000 },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          {
+            "throwStatus": 403,
+            "headers": { "x-ratelimit-remaining": "4999", "x-ratelimit-reset": "3600" }
+          }
+        ]
+      },
+      "expect": { "outcome": "error", "attempts": 1, "sleeps": [] }
+    }
+  ]
+}

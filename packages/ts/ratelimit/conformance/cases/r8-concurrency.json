@@ -1,0 +1,38 @@
+{
+  "file": "r8-concurrency",
+  "description": "R8 — in-flight requests are capped, not just their rate. Secondary limits are provoked by parallelism, so bounding the rate alone does not prevent them.",
+  "cases": [
+    {
+      "id": "R8-001",
+      "requirements": ["R8"],
+      "title": "Ten concurrent callers with a cap of three never exceed three in flight",
+      "kind": "concurrency",
+      "input": { "config": { "maxConcurrent": 3 }, "tasks": 10 },
+      "expect": { "maxObservedInFlight": 3, "completed": 10 }
+    },
+    {
+      "id": "R8-002",
+      "requirements": ["R8"],
+      "title": "A cap of one serializes completely",
+      "kind": "concurrency",
+      "input": { "config": { "maxConcurrent": 1 }, "tasks": 5 },
+      "expect": { "maxObservedInFlight": 1, "completed": 5 }
+    },
+    {
+      "id": "R8-003",
+      "requirements": ["R8"],
+      "title": "Requests over the cap queue rather than fail",
+      "kind": "concurrency",
+      "input": { "config": { "maxConcurrent": 2 }, "tasks": 25 },
+      "expect": { "maxObservedInFlight": 2, "completed": 25 }
+    },
+    {
+      "id": "R8-004",
+      "requirements": ["R8", "R12"],
+      "title": "A cap above the workload never engages",
+      "kind": "concurrency",
+      "input": { "config": { "maxConcurrent": 16 }, "tasks": 4 },
+      "expect": { "maxObservedInFlight": 4, "completed": 4 }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+.icon {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+}
+
+.spin {
+  animation: rotate 0.8s linear infinite;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

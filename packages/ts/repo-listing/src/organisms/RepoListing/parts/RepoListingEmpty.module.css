@@ -1,0 +1,8 @@
+.empty {
+  border-radius: 0.75rem;
+  border: 1px dashed #cbd5e1;
+  background: #ffffff;
+  padding: 3rem;
+  text-align: center;
+  color: #64748b;
+}

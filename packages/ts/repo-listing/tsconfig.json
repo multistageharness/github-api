@@ -1,0 +1,17 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // Bundled React library: Vite resolves imports (CSS modules, extensionless
+    // relative paths), so use bundler-style resolution instead of NodeNext.
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vitest/globals", "vite/client"],
+    "noEmit": true,
+    // vitest.config.ts imports the shared `../vitest.shared.ts` by its .ts path
+    // (same as the other workspace packages); type-only/declaration emit allows it.
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src", "dev", "vite.config.ts", "vite.lib.config.ts", "vitest.config.ts"]
+}

@@ -1,0 +1,9 @@
+.app {
+  display: flex;
+  height: 100vh;
+  flex-direction: column;
+  background: #f8fafc;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  color: #0f172a;
+}
+.main { display: flex; min-height: 0; flex: 1; }

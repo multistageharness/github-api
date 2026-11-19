@@ -1,0 +1,163 @@
+{
+  "file": "r10-observability",
+  "description": "R10 — limit state and lifecycle events are exposed so consumers can keep rendering what they render today. The package itself never writes to stdout or stderr.",
+  "cases": [
+    {
+      "id": "R10-001",
+      "requirements": ["R10"],
+      "title": "Limit, remaining, used, reset and time-until-reset are all readable",
+      "kind": "store",
+      "input": {
+        "observations": [
+          {
+            "headers": {
+              "x-ratelimit-limit": "5000",
+              "x-ratelimit-remaining": "10",
+              "x-ratelimit-used": "4990",
+              "x-ratelimit-reset": "3600",
+              "x-ratelimit-resource": "core"
+            },
+            "fallbackResource": "core",
+            "atMs": 0
+          }
+        ],
+        "nowMs": 0
+      },
+      "expect": {
+        "statuses": {
+          "core": {
+            "limit": 5000,
+            "remaining": 10,
+            "used": 4990,
+            "reset": 3600,
+            "exhausted": false,
+            "secondsUntilReset": 3600
+          }
+        }
+      }
+    },
+    {
+      "id": "R10-002",
+      "requirements": ["R10"],
+      "title": "An exhausted budget reports as exhausted",
+      "kind": "store",
+      "input": {
+        "observations": [
+          {
+            "headers": {
+              "x-ratelimit-limit": "5000",
+              "x-ratelimit-remaining": "0",
+              "x-ratelimit-reset": "3600",
+              "x-ratelimit-resource": "core"
+            },
+            "fallbackResource": "core",
+            "atMs": 0
+          }
+        ],
+        "nowMs": 0
+      },
+      "expect": { "statuses": { "core": { "remaining": 0, "exhausted": true } } }
+    },
+    {
+      "id": "R10-003",
+      "requirements": ["R10", "R6"],
+      "title": "Time until a reset already past reports zero, not a negative",
+      "kind": "store",
+      "input": {
+        "observations": [
+          {
+            "headers": {
+              "x-ratelimit-limit": "5000",
+              "x-ratelimit-remaining": "10",
+              "x-ratelimit-reset": "10",
+              "x-ratelimit-resource": "core"
+            },
+            "fallbackResource": "core",
+            "atMs": 0
+          }
+        ],
+        "nowMs": 100000
+      },
+      "expect": { "statuses": { "core": { "secondsUntilReset": 0 } } }
+    },
+    {
+      "id": "R10-004",
+      "requirements": ["R10"],
+      "title": "An unobserved resource reports unknown, not empty",
+      "kind": "store",
+      "input": { "observations": [], "nowMs": 0 },
+      "expect": {
+        "statuses": {
+          "core": { "limit": null, "remaining": null, "used": null, "reset": null, "exhausted": false }
+        }
+      }
+    },
+    {
+      "id": "R10-005",
+      "requirements": ["R10"],
+      "title": "Throttling, waiting, retrying and classifying are all observable",
+      "kind": "scenario",
+      "input": {
+        "config": {
+          "minIntervalMs": 1000,
+          "maxRetries": 1,
+          "maxWaitMs": 600000,
+          "backoff": { "jitter": "none", "baseMs": 0 }
+        },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          {
+            "status": 403,
+            "headers": { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "60", "x-ratelimit-limit": "5000" }
+          },
+          {
+            "status": 200,
+            "headers": { "x-ratelimit-remaining": "4999", "x-ratelimit-reset": "3660", "x-ratelimit-limit": "5000" }
+          }
+        ]
+      },
+      "expect": {
+        "outcome": "success",
+        "attempts": 2,
+        "events": ["state", "exhaustion", "limit", "wait", "retry"]
+      }
+    },
+    {
+      "id": "R10-006",
+      "requirements": ["R10"],
+      "title": "Crossing the exhaustion threshold is reported",
+      "kind": "scenario",
+      "input": {
+        "config": { "nearExhaustionThreshold": 100, "maxRetries": 0 },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          {
+            "status": 200,
+            "headers": { "x-ratelimit-remaining": "50", "x-ratelimit-reset": "3600", "x-ratelimit-limit": "5000" }
+          }
+        ]
+      },
+      "expect": { "outcome": "success", "events": ["state", "exhaustion"] }
+    },
+    {
+      "id": "R10-007",
+      "requirements": ["R10", "N9"],
+      "title": "A healthy response reports state but not exhaustion",
+      "kind": "scenario",
+      "input": {
+        "config": { "nearExhaustionThreshold": 100, "maxRetries": 0 },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          {
+            "status": 200,
+            "headers": { "x-ratelimit-remaining": "4999", "x-ratelimit-reset": "3600", "x-ratelimit-limit": "5000" }
+          }
+        ]
+      },
+      "expect": { "outcome": "success", "events": ["state"], "eventsAbsent": ["exhaustion", "limit", "wait", "retry", "throttle"] }
+    }
+  ]
+}

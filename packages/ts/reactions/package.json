@@ -1,0 +1,86 @@
+{
+  "name": "@internal/github-sdk-reactions",
+  "version": "0.0.1",
+  "description": "GitHub Reactions API CLI and SDK - Interact with reactions to various GitHub entities (TypeScript)",
+  "type": "module",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "bin": {
+    "github-reactions": "./dist/esm/cli.js"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    },
+    "./client": {
+      "import": {
+        "types": "./dist/esm/client/ReactionsClient.d.ts",
+        "default": "./dist/esm/client/ReactionsClient.js"
+      },
+      "require": {
+        "types": "./dist/cjs/client/ReactionsClient.d.ts",
+        "default": "./dist/cjs/client/ReactionsClient.js"
+      }
+    },
+    "./types": {
+      "import": {
+        "types": "./dist/esm/core/types.d.ts",
+        "default": "./dist/esm/core/types.js"
+      },
+      "require": {
+        "types": "./dist/cjs/core/types.d.ts",
+        "default": "./dist/cjs/core/types.js"
+      }
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "examples:typecheck": "tsc -p examples/tsconfig.json",
+    "build": "rm -rf dist && node ../scripts/gen-version.mjs . && tsc -p tsconfig.build.json --module NodeNext --moduleResolution NodeNext --outDir dist/esm && tsc -p tsconfig.build.json --module CommonJS --moduleResolution Node10 --outDir dist/cjs && node ../scripts/fixup-dist.mjs .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "keywords": [
+    "github",
+    "reactions",
+    "api",
+    "cli",
+    "sdk",
+    "nodejs",
+    "rest-api",
+    "github-api"
+  ],
+  "author": "GitHub API Module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "dependencies": {
+    "@internal/github-sdk-fetch-proxy": "^0.0.1",
+    "@internal/github-sdk-fetch-rest-api": "^0.0.1",
+    "@internal/github-sdk-ratelimit": "^0.0.1",
+    "chalk": "^5.3.0",
+    "commander": "^12.0.0",
+    "inquirer": "^9.2.0",
+    "winston": "^3.11.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ]
+}

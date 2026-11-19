@@ -1,0 +1,52 @@
+{
+  "name": "github-api-module-ts",
+  "version": "1.0.0",
+  "description": "GitHub API modules — TypeScript SDKs + CLIs",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "ratelimit",
+    "fetch-rest-api",
+    "fetch-graphql-api",
+    "fetch-github-sdk",
+    "fetch-proxy",
+    "cli-progressor",
+    "activity",
+    "repos",
+    "users",
+    "reactions",
+    "clone",
+    "git",
+    "issues",
+    "pulls",
+    "teams",
+    "gist",
+    "search",
+    "search-cli",
+    "repo-listing",
+    "sdk"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "npm run format --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "examples:typecheck": "npm run examples:typecheck --workspaces --if-present",
+    "test:live": "GITHUB_LIVE=1 vitest run -c vitest.live.config.ts",
+    "typecheck:live": "tsc -p live/tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.3.0",
+    "@types/node": "^20.11.0"
+  },
+  "engines": {
+    "node": ">=20.19.0",
+    "npm": ">=9.0.0"
+  }
+}

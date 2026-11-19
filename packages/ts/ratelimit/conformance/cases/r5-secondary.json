@@ -1,0 +1,335 @@
+{
+  "file": "r5-secondary",
+  "description": "R5 — secondary limits are distinct from an exhausted primary budget. Waiting for the primary reset does not clear one, and retrying into one makes it worse.",
+  "cases": [
+    {
+      "id": "R5-001",
+      "requirements": ["R5"],
+      "title": "GitHub's secondary-limit wording is recognized",
+      "kind": "classify",
+      "input": {
+        "status": 403,
+        "headers": { "x-ratelimit-remaining": "4321", "x-ratelimit-reset": "3600" },
+        "data": { "message": "You have exceeded a secondary rate limit. Please wait a few minutes before you try again." },
+        "nowMs": 0,
+        "resourceHint": "core"
+      },
+      "expect": { "kind": "secondary", "isRateLimit": true }
+    },
+    {
+      "id": "R5-002",
+      "requirements": ["R5"],
+      "title": "The abuse-detection wording is the same signal",
+      "kind": "classify",
+      "input": {
+        "status": 403,
+        "headers": {},
+        "data": { "message": "You have triggered an abuse detection mechanism." },
+        "nowMs": 0,
+        "resourceHint": "core"
+      },
+      "expect": { "kind": "secondary", "isRateLimit": true }
+    },
+    {
+      "id": "R5-003",
+      "requirements": ["R5"],
+      "title": "The body outranks the headers when both are present",
+      "kind": "classify",
+      "input": {
+        "status": 403,
+        "headers": { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "3600" },
+        "data": { "message": "You have exceeded a secondary rate limit." },
+        "nowMs": 0,
+        "resourceHint": "core"
+      },
+      "expect": { "kind": "secondary", "isRateLimit": true }
+    },
+    {
+      "id": "R5-004",
+      "requirements": ["R5"],
+      "title": "A 429 with budget still available is a burst throttle, not budget exhaustion",
+      "kind": "classify",
+      "input": {
+        "status": 429,
+        "headers": { "x-ratelimit-remaining": "100", "x-ratelimit-reset": "3600" },
+        "data": null,
+        "nowMs": 0,
+        "resourceHint": "core"
+      },
+      "expect": { "kind": "secondary", "isRateLimit": true }
+    },
+    {
+      "id": "R5-005",
+      "requirements": ["R5"],
+      "title": "The first secondary limit waits exactly as instructed",
+      "kind": "wait",
+      "input": {
+        "classification": { "kind": "secondary", "retryAfterMs": 1000, "resetAtMs": null },
+        "nowMs": 0,
+        "maxWaitMs": 600000,
+        "paddingMs": 1000,
+        "fallbackMs": 1000,
+        "secondaryStreak": 0,
+        "secondaryEscalationFactor": 2
+      },
+      "expect": { "waitMs": 1000, "requestedMs": 1000, "exceedsCeiling": false, "retryAfterUsed": true }
+    },
+    {
+      "id": "R5-006",
+      "requirements": ["R5"],
+      "title": "A repeated secondary limit escalates rather than repeating the same delay",
+      "kind": "wait",
+      "input": {
+        "classification": { "kind": "secondary", "retryAfterMs": 1000, "resetAtMs": null },
+        "nowMs": 0,
+        "maxWaitMs": 600000,
+        "paddingMs": 1000,
+        "fallbackMs": 1000,
+        "secondaryStreak": 2,
+        "secondaryEscalationFactor": 2
+      },
+      "expect": { "waitMs": 4000, "requestedMs": 4000, "exceedsCeiling": false, "retryAfterUsed": true }
+    },
+    {
+      "id": "R5-007",
+      "requirements": ["R5"],
+      "title": "A primary limit never escalates — its reset time is a fact, not a guess",
+      "kind": "wait",
+      "input": {
+        "classification": { "kind": "primary", "retryAfterMs": 1000, "resetAtMs": null },
+        "nowMs": 0,
+        "maxWaitMs": 600000,
+        "paddingMs": 1000,
+        "fallbackMs": 1000,
+        "secondaryStreak": 3,
+        "secondaryEscalationFactor": 2
+      },
+      "expect": { "waitMs": 1000, "requestedMs": 1000, "exceedsCeiling": false, "retryAfterUsed": true }
+    },
+    {
+      "id": "R5-008",
+      "requirements": ["R5", "R8", "R10"],
+      "title": "A secondary limit reduces the concurrency cap as well as waiting",
+      "kind": "scenario",
+      "input": {
+        "config": {
+          "maxConcurrent": 8,
+          "maxRetries": 1,
+          "maxWaitMs": 600000,
+          "backoff": { "jitter": "none", "baseMs": 0 }
+        },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          {
+            "status": 403,
+            "headers": { "retry-after": "5" },
+            "data": { "message": "You have exceeded a secondary rate limit." }
+          },
+          {
+            "status": 200,
+            "headers": { "x-ratelimit-remaining": "4999", "x-ratelimit-reset": "3600", "x-ratelimit-limit": "5000" }
+          }
+        ]
+      },
+      "expect": {
+        "outcome": "success",
+        "attempts": 2,
+        "sleeps": [5000],
+        "events": ["limit", "concurrency", "wait", "retry"],
+        "finalConcurrencyLimit": 4
+      }
+    },
+    {
+      "id": "R5-009",
+      "requirements": ["R5", "R11"],
+      "title": "A secondary limit the consumer sees is labelled as such, not as budget exhaustion",
+      "kind": "scenario",
+      "input": {
+        "config": { "maxRetries": 0, "maxWaitMs": 600000 },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          {
+            "throwStatus": 429,
+            "headers": { "retry-after": "5" },
+            "data": { "message": "You have exceeded a secondary rate limit." }
+          }
+        ]
+      },
+      "expect": {
+        "outcome": "rate-limit",
+        "attempts": 1,
+        "sleeps": [],
+        "error": { "kind": "secondary", "resource": "core", "status": 429, "retried": false, "exceededWaitCeiling": false }
+      }
+    },
+    {
+      "id": "R5-010",
+      "requirements": ["R5", "R3", "R4"],
+      "title": "A 403 with Retry-After and budget remaining is a secondary limit, even with no body to read",
+      "kind": "classify",
+      "input": {
+        "status": 403,
+        "headers": { "x-ratelimit-remaining": "4999", "retry-after": "60" },
+        "data": null,
+        "nowMs": 0,
+        "resourceHint": "core"
+      },
+      "expect": { "kind": "secondary", "isRateLimit": true, "resource": "core", "retryAfterMs": 60000 }
+    },
+    {
+      "id": "R5-011",
+      "requirements": ["R5", "R8"],
+      "title": "Back-to-back secondary limits on one request still escalate and keep cutting the cap",
+      "kind": "scenario",
+      "input": {
+        "config": {
+          "maxConcurrent": 8,
+          "maxRetries": 2,
+          "maxWaitMs": 600000,
+          "backoff": { "jitter": "none", "baseMs": 0 }
+        },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          {
+            "status": 403,
+            "headers": { "retry-after": "5" },
+            "data": { "message": "You have exceeded a secondary rate limit." }
+          },
+          {
+            "status": 403,
+            "headers": { "retry-after": "5" },
+            "data": { "message": "You have exceeded a secondary rate limit." }
+          },
+          { "status": 200, "headers": {} }
+        ]
+      },
+      "expect": { "outcome": "success", "attempts": 3, "sleeps": [5000, 10000], "finalConcurrencyLimit": 2 }
+    },
+    {
+      "id": "R5-012",
+      "requirements": ["R5", "R8"],
+      "title": "Concurrent requests hitting one secondary limit wait it out once: no escalation, one cap cut",
+      "kind": "concurrent-scenario",
+      "input": {
+        "config": { "maxConcurrent": 8, "maxRetries": 3, "backoff": { "jitter": "none", "baseMs": 0 } },
+        "startTimeMs": 0,
+        "requests": [
+          {
+            "url": "/repos/o/r",
+            "method": "GET",
+            "responses": [
+              {
+                "status": 403,
+                "headers": { "retry-after": "20" },
+                "data": { "message": "You have exceeded a secondary rate limit." }
+              },
+              { "status": 200, "headers": {} }
+            ]
+          },
+          {
+            "url": "/repos/o/r",
+            "method": "GET",
+            "responses": [
+              {
+                "status": 403,
+                "headers": { "retry-after": "20" },
+                "data": { "message": "You have exceeded a secondary rate limit." }
+              },
+              { "status": 200, "headers": {} }
+            ]
+          },
+          {
+            "url": "/repos/o/r",
+            "method": "GET",
+            "responses": [
+              {
+                "status": 403,
+                "headers": { "retry-after": "20" },
+                "data": { "message": "You have exceeded a secondary rate limit." }
+              },
+              { "status": 200, "headers": {} }
+            ]
+          },
+          {
+            "url": "/repos/o/r",
+            "method": "GET",
+            "responses": [
+              {
+                "status": 403,
+                "headers": { "retry-after": "20" },
+                "data": { "message": "You have exceeded a secondary rate limit." }
+              },
+              { "status": 200, "headers": {} }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "outcomes": ["success", "success", "success", "success"],
+        "attempts": 8,
+        "sleeps": [20000, 20000, 20000, 20000],
+        "elapsedMs": 20000,
+        "finalConcurrencyLimit": 4
+      }
+    },
+    {
+      "id": "R5-013",
+      "requirements": ["R5", "R6"],
+      "title": "A secondary limit with neither Retry-After nor a reset waits a minute, not the primary fallback",
+      "kind": "wait",
+      "input": {
+        "classification": { "kind": "secondary", "retryAfterMs": null, "resetAtMs": null },
+        "nowMs": 0,
+        "maxWaitMs": 60000,
+        "paddingMs": 1000,
+        "fallbackMs": 1000,
+        "secondaryFallbackMs": 60000,
+        "secondaryStreak": 0,
+        "secondaryEscalationFactor": 2
+      },
+      "expect": { "waitMs": 60000, "requestedMs": 60000, "exceedsCeiling": false, "retryAfterUsed": false }
+    },
+    {
+      "id": "R5-014",
+      "requirements": ["R5", "R12"],
+      "title": "By default a bare secondary limit is waited out for the documented minute",
+      "kind": "scenario",
+      "input": {
+        "config": { "maxRetries": 1, "backoff": { "jitter": "none", "baseMs": 0 } },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [{ "status": 429, "headers": { "x-ratelimit-remaining": "4999" } }, { "status": 200, "headers": {} }]
+      },
+      "expect": { "outcome": "success", "attempts": 2, "sleeps": [60000] }
+    },
+    {
+      "id": "R5-015",
+      "requirements": ["R5", "R8"],
+      "title": "Cap recovery never climbs past maxConcurrent, even when doubling would",
+      "kind": "scenario",
+      "input": {
+        "config": {
+          "maxConcurrent": 3,
+          "secondaryConcurrencyFloor": 2,
+          "secondaryRecoveryAfter": 1,
+          "maxRetries": 1,
+          "backoff": { "jitter": "none", "baseMs": 0 }
+        },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          {
+            "status": 403,
+            "headers": { "retry-after": "5" },
+            "data": { "message": "You have exceeded a secondary rate limit." }
+          },
+          { "status": 200, "headers": {} }
+        ]
+      },
+      "expect": { "outcome": "success", "attempts": 2, "sleeps": [5000], "finalConcurrencyLimit": 3 }
+    }
+  ]
+}

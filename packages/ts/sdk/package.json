@@ -1,0 +1,237 @@
+{
+  "name": "@internal/github-sdk",
+  "version": "0.0.1",
+  "description": "Every @internal/github-sdk-* package in one install — namespaced re-exports plus one subpath per package. Install a single @internal/github-sdk-<pkg> to take only that one.",
+  "type": "module",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    },
+    "./ratelimit": {
+      "import": {
+        "types": "./dist/esm/ratelimit.d.ts",
+        "default": "./dist/esm/ratelimit.js"
+      },
+      "require": {
+        "types": "./dist/cjs/ratelimit.d.ts",
+        "default": "./dist/cjs/ratelimit.js"
+      }
+    },
+    "./fetch-rest-api": {
+      "import": {
+        "types": "./dist/esm/fetch-rest-api.d.ts",
+        "default": "./dist/esm/fetch-rest-api.js"
+      },
+      "require": {
+        "types": "./dist/cjs/fetch-rest-api.d.ts",
+        "default": "./dist/cjs/fetch-rest-api.js"
+      }
+    },
+    "./fetch-graphql-api": {
+      "import": {
+        "types": "./dist/esm/fetch-graphql-api.d.ts",
+        "default": "./dist/esm/fetch-graphql-api.js"
+      },
+      "require": {
+        "types": "./dist/cjs/fetch-graphql-api.d.ts",
+        "default": "./dist/cjs/fetch-graphql-api.js"
+      }
+    },
+    "./fetch-github-sdk": {
+      "import": {
+        "types": "./dist/esm/fetch-github-sdk.d.ts",
+        "default": "./dist/esm/fetch-github-sdk.js"
+      },
+      "require": {
+        "types": "./dist/cjs/fetch-github-sdk.d.ts",
+        "default": "./dist/cjs/fetch-github-sdk.js"
+      }
+    },
+    "./fetch-proxy": {
+      "import": {
+        "types": "./dist/esm/fetch-proxy.d.ts",
+        "default": "./dist/esm/fetch-proxy.js"
+      },
+      "require": {
+        "types": "./dist/cjs/fetch-proxy.d.ts",
+        "default": "./dist/cjs/fetch-proxy.js"
+      }
+    },
+    "./cli-progressor": {
+      "import": {
+        "types": "./dist/esm/cli-progressor.d.ts",
+        "default": "./dist/esm/cli-progressor.js"
+      },
+      "require": {
+        "types": "./dist/cjs/cli-progressor.d.ts",
+        "default": "./dist/cjs/cli-progressor.js"
+      }
+    },
+    "./activity": {
+      "import": {
+        "types": "./dist/esm/activity.d.ts",
+        "default": "./dist/esm/activity.js"
+      },
+      "require": {
+        "types": "./dist/cjs/activity.d.ts",
+        "default": "./dist/cjs/activity.js"
+      }
+    },
+    "./repos": {
+      "import": {
+        "types": "./dist/esm/repos.d.ts",
+        "default": "./dist/esm/repos.js"
+      },
+      "require": {
+        "types": "./dist/cjs/repos.d.ts",
+        "default": "./dist/cjs/repos.js"
+      }
+    },
+    "./users": {
+      "import": {
+        "types": "./dist/esm/users.d.ts",
+        "default": "./dist/esm/users.js"
+      },
+      "require": {
+        "types": "./dist/cjs/users.d.ts",
+        "default": "./dist/cjs/users.js"
+      }
+    },
+    "./reactions": {
+      "import": {
+        "types": "./dist/esm/reactions.d.ts",
+        "default": "./dist/esm/reactions.js"
+      },
+      "require": {
+        "types": "./dist/cjs/reactions.d.ts",
+        "default": "./dist/cjs/reactions.js"
+      }
+    },
+    "./clone": {
+      "import": {
+        "types": "./dist/esm/clone.d.ts",
+        "default": "./dist/esm/clone.js"
+      },
+      "require": {
+        "types": "./dist/cjs/clone.d.ts",
+        "default": "./dist/cjs/clone.js"
+      }
+    },
+    "./git": {
+      "import": {
+        "types": "./dist/esm/git.d.ts",
+        "default": "./dist/esm/git.js"
+      },
+      "require": {
+        "types": "./dist/cjs/git.d.ts",
+        "default": "./dist/cjs/git.js"
+      }
+    },
+    "./issues": {
+      "import": {
+        "types": "./dist/esm/issues.d.ts",
+        "default": "./dist/esm/issues.js"
+      },
+      "require": {
+        "types": "./dist/cjs/issues.d.ts",
+        "default": "./dist/cjs/issues.js"
+      }
+    },
+    "./pulls": {
+      "import": {
+        "types": "./dist/esm/pulls.d.ts",
+        "default": "./dist/esm/pulls.js"
+      },
+      "require": {
+        "types": "./dist/cjs/pulls.d.ts",
+        "default": "./dist/cjs/pulls.js"
+      }
+    },
+    "./teams": {
+      "import": {
+        "types": "./dist/esm/teams.d.ts",
+        "default": "./dist/esm/teams.js"
+      },
+      "require": {
+        "types": "./dist/cjs/teams.d.ts",
+        "default": "./dist/cjs/teams.js"
+      }
+    },
+    "./gist": {
+      "import": {
+        "types": "./dist/esm/gist.d.ts",
+        "default": "./dist/esm/gist.js"
+      },
+      "require": {
+        "types": "./dist/cjs/gist.d.ts",
+        "default": "./dist/cjs/gist.js"
+      }
+    },
+    "./search": {
+      "import": {
+        "types": "./dist/esm/search.d.ts",
+        "default": "./dist/esm/search.js"
+      },
+      "require": {
+        "types": "./dist/cjs/search.d.ts",
+        "default": "./dist/cjs/search.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "rm -rf dist && node ../scripts/gen-version.mjs . && tsc -p tsconfig.build.json --module NodeNext --moduleResolution NodeNext --outDir dist/esm && tsc -p tsconfig.build.json --module CommonJS --moduleResolution Node10 --outDir dist/cjs && node ../scripts/fixup-dist.mjs .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "keywords": [
+    "github",
+    "api",
+    "sdk"
+  ],
+  "author": "GitHub API Module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "dependencies": {
+    "@internal/github-sdk-ratelimit": "^0.0.1",
+    "@internal/github-sdk-fetch-rest-api": "^0.0.1",
+    "@internal/github-sdk-fetch-graphql-api": "^0.0.1",
+    "@internal/github-sdk-fetch-github-sdk": "^0.0.1",
+    "@internal/github-sdk-fetch-proxy": "^0.0.1",
+    "@internal/cli-progressor": "^1.0.3",
+    "@internal/github-sdk-activity": "^0.0.1",
+    "@internal/github-sdk-repos": "^0.0.1",
+    "@internal/github-sdk-users": "^0.0.1",
+    "@internal/github-sdk-reactions": "^0.0.1",
+    "@internal/github-sdk-clone": "^1.0.1",
+    "@internal/github-sdk-git": "^0.0.1",
+    "@internal/github-sdk-issues": "^0.0.1",
+    "@internal/github-sdk-pulls": "^0.0.1",
+    "@internal/github-sdk-teams": "^0.0.1",
+    "@internal/github-sdk-gist": "^0.0.1",
+    "@internal/github-sdk-search": "^0.0.1"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ]
+}

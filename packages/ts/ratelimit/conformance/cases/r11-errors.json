@@ -1,0 +1,154 @@
+{
+  "file": "r11-errors",
+  "description": "R11 — one rate-limit error contract per runtime, carrying resource, kind, reset, advised wait and whether a retry was attempted, distinguishable from a permission failure by type rather than by matching a message string.",
+  "cases": [
+    {
+      "id": "R11-001",
+      "requirements": ["R11"],
+      "title": "The error names the resource, the kind and the status",
+      "kind": "scenario",
+      "input": {
+        "config": { "maxRetries": 0, "maxWaitMs": 600000 },
+        "startTimeMs": 0,
+        "request": { "url": "/search/repositories?q=x", "method": "GET" },
+        "responses": [
+          {
+            "throwStatus": 403,
+            "headers": {
+              "x-ratelimit-remaining": "0",
+              "x-ratelimit-reset": "60",
+              "x-ratelimit-limit": "30",
+              "x-ratelimit-resource": "search"
+            }
+          }
+        ]
+      },
+      "expect": {
+        "outcome": "rate-limit",
+        "error": {
+          "kind": "primary",
+          "resource": "search",
+          "status": 403,
+          "retried": false,
+          "exceededWaitCeiling": false,
+          "resetAtMs": 60000
+        }
+      }
+    },
+    {
+      "id": "R11-002",
+      "requirements": ["R11", "R3"],
+      "title": "A permission failure is not converted into a rate-limit error",
+      "kind": "scenario",
+      "input": {
+        "config": { "maxRetries": 0, "maxWaitMs": 600000 },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          {
+            "throwStatus": 403,
+            "headers": { "x-ratelimit-remaining": "4999", "x-ratelimit-reset": "3600" },
+            "data": { "message": "Resource not accessible by integration" }
+          }
+        ]
+      },
+      "expect": { "outcome": "error" }
+    },
+    {
+      "id": "R11-003",
+      "requirements": ["R11"],
+      "title": "The error records that a retry was attempted before giving up",
+      "kind": "scenario",
+      "input": {
+        "config": {
+          "maxRetries": 1,
+          "maxWaitMs": 600000,
+          "backoff": { "jitter": "none", "baseMs": 0 }
+        },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          { "throwStatus": 429, "headers": { "retry-after": "1" } },
+          { "throwStatus": 429, "headers": { "retry-after": "1" } }
+        ]
+      },
+      "expect": {
+        "outcome": "rate-limit",
+        "attempts": 2,
+        "error": { "kind": "secondary", "retried": true }
+      }
+    },
+    {
+      "id": "R11-005",
+      "requirements": ["R11"],
+      "title": "The error carries GitHub's own message, not a substitute for it",
+      "kind": "scenario",
+      "input": {
+        "config": { "maxRetries": 0, "maxWaitMs": 600000 },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          {
+            "status": 403,
+            "headers": { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "60", "x-ratelimit-limit": "5000" },
+            "data": { "message": "API rate limit exceeded for user ID 1234." }
+          }
+        ]
+      },
+      "expect": {
+        "outcome": "rate-limit",
+        "error": {
+          "kind": "primary",
+          "message": "API rate limit exceeded for user ID 1234.",
+          "responseStatus": 403
+        }
+      }
+    },
+    {
+      "id": "R11-006",
+      "requirements": ["R11"],
+      "title": "With no body to quote, the error falls back to its own wording",
+      "kind": "scenario",
+      "input": {
+        "config": { "maxRetries": 0, "maxWaitMs": 600000 },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          {
+            "status": 403,
+            "headers": { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "60", "x-ratelimit-limit": "5000" }
+          }
+        ]
+      },
+      "expect": {
+        "outcome": "rate-limit",
+        "error": {
+          "kind": "primary",
+          "message": "GitHub rate limit exceeded for 'core' (status 403)",
+          "responseStatus": 403
+        }
+      }
+    },
+    {
+      "id": "R11-004",
+      "requirements": ["R11", "R6"],
+      "title": "An unaffordable wait is reported as such on the error itself",
+      "kind": "scenario",
+      "input": {
+        "config": { "maxRetries": 3, "maxWaitMs": 1000 },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          {
+            "throwStatus": 403,
+            "headers": { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "3600", "x-ratelimit-limit": "5000" }
+          }
+        ]
+      },
+      "expect": {
+        "outcome": "rate-limit",
+        "error": { "kind": "primary", "exceededWaitCeiling": true, "retried": false }
+      }
+    }
+  ]
+}

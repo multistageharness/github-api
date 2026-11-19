@@ -1,0 +1,312 @@
+{
+  "file": "r2-resources",
+  "description": "R2 — every GitHub resource is an independent budget. Spending from one never appears to spend from another, and an unrecognized resource is tracked rather than folded into core.",
+  "cases": [
+    {
+      "id": "R2-001",
+      "requirements": ["R2"],
+      "title": "A /search path is metered under search, not core",
+      "kind": "resource-from-url",
+      "input": { "url": "/search/repositories?q=language:ts" },
+      "expect": { "resource": "search" }
+    },
+    {
+      "id": "R2-002",
+      "requirements": ["R2"],
+      "title": "An absolute search URL resolves the same as a path",
+      "kind": "resource-from-url",
+      "input": { "url": "https://api.github.com/search/issues?q=fetch" },
+      "expect": { "resource": "search" }
+    },
+    {
+      "id": "R2-003",
+      "requirements": ["R2"],
+      "title": "GraphQL is its own bucket",
+      "kind": "resource-from-url",
+      "input": { "url": "/graphql" },
+      "expect": { "resource": "graphql" }
+    },
+    {
+      "id": "R2-004",
+      "requirements": ["R2"],
+      "title": "An ordinary REST path is core",
+      "kind": "resource-from-url",
+      "input": { "url": "/repos/octocat/hello-world/issues" },
+      "expect": { "resource": "core" }
+    },
+    {
+      "id": "R2-005",
+      "requirements": ["R2"],
+      "title": "No URL at all defaults to core",
+      "kind": "resource-from-url",
+      "input": { "url": null },
+      "expect": { "resource": "core" }
+    },
+    {
+      "id": "R2-006",
+      "requirements": ["R2"],
+      "title": "A path that merely contains 'search' is not the search bucket",
+      "kind": "resource-from-url",
+      "input": { "url": "/repos/o/searchlight/contents" },
+      "expect": { "resource": "core" }
+    },
+    {
+      "id": "R2-007",
+      "requirements": ["R2"],
+      "title": "Interleaved core and search responses keep separate budgets",
+      "kind": "store",
+      "input": {
+        "observations": [
+          {
+            "headers": {
+              "x-ratelimit-limit": "5000",
+              "x-ratelimit-remaining": "4999",
+              "x-ratelimit-reset": "3600",
+              "x-ratelimit-resource": "core"
+            },
+            "fallbackResource": "core",
+            "atMs": 0
+          },
+          {
+            "headers": {
+              "x-ratelimit-limit": "30",
+              "x-ratelimit-remaining": "29",
+              "x-ratelimit-reset": "60",
+              "x-ratelimit-resource": "search"
+            },
+            "fallbackResource": "search",
+            "atMs": 100
+          },
+          {
+            "headers": {
+              "x-ratelimit-limit": "5000",
+              "x-ratelimit-remaining": "4998",
+              "x-ratelimit-reset": "3600",
+              "x-ratelimit-resource": "core"
+            },
+            "fallbackResource": "core",
+            "atMs": 200
+          }
+        ],
+        "nowMs": 200
+      },
+      "expect": {
+        "statuses": {
+          "core": { "limit": 5000, "remaining": 4998 },
+          "search": { "limit": 30, "remaining": 29 }
+        }
+      }
+    },
+    {
+      "id": "R2-008",
+      "requirements": ["R2"],
+      "title": "An exhausted search budget leaves core untouched",
+      "kind": "store",
+      "input": {
+        "observations": [
+          {
+            "headers": {
+              "x-ratelimit-limit": "5000",
+              "x-ratelimit-remaining": "4999",
+              "x-ratelimit-reset": "3600",
+              "x-ratelimit-resource": "core"
+            },
+            "fallbackResource": "core",
+            "atMs": 0
+          },
+          {
+            "headers": {
+              "x-ratelimit-limit": "30",
+              "x-ratelimit-remaining": "0",
+              "x-ratelimit-reset": "60",
+              "x-ratelimit-resource": "search"
+            },
+            "fallbackResource": "search",
+            "atMs": 100
+          }
+        ],
+        "nowMs": 100
+      },
+      "expect": {
+        "statuses": {
+          "core": { "remaining": 4999, "exhausted": false },
+          "search": { "remaining": 0, "exhausted": true }
+        }
+      }
+    },
+    {
+      "id": "R2-009",
+      "requirements": ["R2"],
+      "title": "An unrecognized resource is tracked under its own name, not merged into core",
+      "kind": "store",
+      "input": {
+        "observations": [
+          {
+            "headers": {
+              "x-ratelimit-limit": "100",
+              "x-ratelimit-remaining": "99",
+              "x-ratelimit-reset": "3600",
+              "x-ratelimit-resource": "audit_log"
+            },
+            "fallbackResource": "core",
+            "atMs": 0
+          }
+        ],
+        "nowMs": 0
+      },
+      "expect": {
+        "statuses": {
+          "audit_log": { "limit": 100, "remaining": 99 },
+          "core": { "limit": null, "remaining": null }
+        }
+      }
+    },
+    {
+      "id": "R2-010",
+      "requirements": ["R2"],
+      "title": "Without an x-ratelimit-resource header the request target decides the bucket",
+      "kind": "store",
+      "input": {
+        "observations": [
+          {
+            "headers": {
+              "x-ratelimit-limit": "30",
+              "x-ratelimit-remaining": "29",
+              "x-ratelimit-reset": "60"
+            },
+            "fallbackResource": "search",
+            "atMs": 0
+          }
+        ],
+        "nowMs": 0
+      },
+      "expect": {
+        "statuses": {
+          "search": { "limit": 30, "remaining": 29 },
+          "core": { "limit": null }
+        }
+      }
+    },
+    {
+      "id": "R2-011",
+      "requirements": ["R2"],
+      "title": "The response's resource header overrides the guess made from the URL",
+      "kind": "classify",
+      "input": {
+        "status": 403,
+        "headers": { "x-ratelimit-remaining": "0", "x-ratelimit-resource": "search" },
+        "data": null,
+        "nowMs": 0,
+        "resourceHint": "core"
+      },
+      "expect": { "kind": "primary", "isRateLimit": true, "resource": "search" }
+    },
+    {
+      "id": "R2-012",
+      "requirements": ["R2"],
+      "title": "Code search has its own, much smaller budget: /search/code is metered as code_search",
+      "kind": "resource-from-url",
+      "input": { "url": "/search/code?q=fetch" },
+      "expect": { "resource": "code_search" }
+    },
+    {
+      "id": "R2-013",
+      "requirements": ["R2"],
+      "title": "A GitHub Enterprise Server /api/v3 prefix does not hide the search bucket",
+      "kind": "resource-from-url",
+      "input": { "url": "https://ghe.example.com/api/v3/search/issues?q=x" },
+      "expect": { "resource": "search" }
+    },
+    {
+      "id": "R2-014",
+      "requirements": ["R2"],
+      "title": "GitHub Enterprise Server GraphQL at /api/graphql is the graphql bucket",
+      "kind": "resource-from-url",
+      "input": { "url": "https://ghe.example.com/api/graphql" },
+      "expect": { "resource": "graphql" }
+    },
+    {
+      "id": "R2-015",
+      "requirements": ["R2", "R1"],
+      "title": "A late response from an older window does not overwrite newer state",
+      "kind": "store",
+      "input": {
+        "observations": [
+          {
+            "headers": { "x-ratelimit-limit": "5000", "x-ratelimit-remaining": "4999", "x-ratelimit-reset": "2000" },
+            "fallbackResource": "core",
+            "atMs": 0
+          },
+          {
+            "headers": { "x-ratelimit-limit": "5000", "x-ratelimit-remaining": "0", "x-ratelimit-reset": "1000" },
+            "fallbackResource": "core",
+            "atMs": 10
+          }
+        ],
+        "nowMs": 10
+      },
+      "expect": { "statuses": { "core": { "remaining": 4999, "reset": 2000, "exhausted": false } } }
+    },
+    {
+      "id": "R2-016",
+      "requirements": ["R2", "R1"],
+      "title": "Within one window the budget only moves down, whatever order responses complete in",
+      "kind": "store",
+      "input": {
+        "observations": [
+          {
+            "headers": { "x-ratelimit-remaining": "10", "x-ratelimit-used": "4990", "x-ratelimit-reset": "2000" },
+            "fallbackResource": "core",
+            "atMs": 0
+          },
+          {
+            "headers": { "x-ratelimit-remaining": "12", "x-ratelimit-used": "4988", "x-ratelimit-reset": "2000" },
+            "fallbackResource": "core",
+            "atMs": 10
+          }
+        ],
+        "nowMs": 10
+      },
+      "expect": { "statuses": { "core": { "remaining": 10, "used": 4990, "reset": 2000 } } }
+    },
+    {
+      "id": "R2-017",
+      "requirements": ["R2", "R7"],
+      "title": "A route whose reported bucket differs from the URL guess is paced against the reported bucket",
+      "kind": "scenario",
+      "input": {
+        "config": { "maxRetries": 0 },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r/dependency-graph/snapshots", "method": "GET" },
+        "repeat": 2,
+        "responses": [
+          {
+            "status": 200,
+            "headers": {
+              "x-ratelimit-resource": "dependency_snapshots",
+              "x-ratelimit-limit": "100",
+              "x-ratelimit-remaining": "5",
+              "x-ratelimit-reset": "60"
+            }
+          },
+          {
+            "status": 200,
+            "headers": {
+              "x-ratelimit-resource": "dependency_snapshots",
+              "x-ratelimit-limit": "100",
+              "x-ratelimit-remaining": "4",
+              "x-ratelimit-reset": "60"
+            }
+          }
+        ]
+      },
+      "expect": {
+        "outcome": "success",
+        "attempts": 2,
+        "sleeps": [5000],
+        "events": ["throttle"],
+        "finalStatus": { "dependency_snapshots": { "remaining": 4 }, "core": { "remaining": null } }
+      }
+    }
+  ]
+}

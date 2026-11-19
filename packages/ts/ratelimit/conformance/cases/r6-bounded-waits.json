@@ -1,0 +1,180 @@
+{
+  "file": "r6-bounded-waits",
+  "description": "R6 — no wait is unbounded and none is uncancellable. A reset an hour out under a 60-second ceiling does not sleep for an hour.",
+  "cases": [
+    {
+      "id": "R6-001",
+      "requirements": ["R6"],
+      "title": "A reset one hour out with a 60s ceiling does not sleep for an hour",
+      "kind": "wait",
+      "input": {
+        "classification": { "kind": "primary", "retryAfterMs": null, "resetAtMs": 3600000 },
+        "nowMs": 0,
+        "maxWaitMs": 60000,
+        "paddingMs": 1000,
+        "fallbackMs": 1000,
+        "secondaryStreak": 0,
+        "secondaryEscalationFactor": 2
+      },
+      "expect": { "waitMs": 60000, "requestedMs": 3601000, "exceedsCeiling": true, "retryAfterUsed": false }
+    },
+    {
+      "id": "R6-002",
+      "requirements": ["R6"],
+      "title": "A reset already in the past yields zero, never a negative sleep",
+      "kind": "wait",
+      "input": {
+        "classification": { "kind": "primary", "retryAfterMs": null, "resetAtMs": 0 },
+        "nowMs": 10000,
+        "maxWaitMs": 60000,
+        "paddingMs": 1000,
+        "fallbackMs": 1000,
+        "secondaryStreak": 0,
+        "secondaryEscalationFactor": 2
+      },
+      "expect": { "waitMs": 0, "requestedMs": 0, "exceedsCeiling": false, "retryAfterUsed": false }
+    },
+    {
+      "id": "R6-003",
+      "requirements": ["R6"],
+      "title": "A limit carrying neither Retry-After nor a reset uses the configured fallback",
+      "kind": "wait",
+      "input": {
+        "classification": { "kind": "primary", "retryAfterMs": null, "resetAtMs": null },
+        "nowMs": 0,
+        "maxWaitMs": 60000,
+        "paddingMs": 1000,
+        "fallbackMs": 1500,
+        "secondaryStreak": 0,
+        "secondaryEscalationFactor": 2
+      },
+      "expect": { "waitMs": 1500, "requestedMs": 1500, "exceedsCeiling": false, "retryAfterUsed": false }
+    },
+    {
+      "id": "R6-004",
+      "requirements": ["R6"],
+      "title": "A clock skewed far ahead of GitHub's still yields zero, not a negative",
+      "kind": "wait",
+      "input": {
+        "classification": { "kind": "primary", "retryAfterMs": null, "resetAtMs": 1000 },
+        "nowMs": 999999999,
+        "maxWaitMs": 60000,
+        "paddingMs": 1000,
+        "fallbackMs": 1000,
+        "secondaryStreak": 0,
+        "secondaryEscalationFactor": 2
+      },
+      "expect": { "waitMs": 0, "requestedMs": 0, "exceedsCeiling": false }
+    },
+    {
+      "id": "R6-005",
+      "requirements": ["R6", "R11"],
+      "title": "A wait past the ceiling surfaces a failure instead of sleeping through it",
+      "kind": "scenario",
+      "input": {
+        "config": { "maxWaitMs": 60000, "maxRetries": 3 },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          {
+            "status": 403,
+            "headers": { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "3600", "x-ratelimit-limit": "5000" }
+          }
+        ]
+      },
+      "expect": {
+        "outcome": "rate-limit",
+        "attempts": 1,
+        "sleeps": [],
+        "error": {
+          "kind": "primary",
+          "resource": "core",
+          "status": 403,
+          "retried": false,
+          "exceededWaitCeiling": true
+        }
+      }
+    },
+    {
+      "id": "R6-006",
+      "requirements": ["R6", "R13"],
+      "title": "A wait inside the ceiling is performed in full and the request replayed",
+      "kind": "scenario",
+      "input": {
+        "config": {
+          "maxWaitMs": 7200000,
+          "maxRetries": 1,
+          "backoff": { "jitter": "none", "baseMs": 0 }
+        },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          {
+            "status": 403,
+            "headers": { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "3600", "x-ratelimit-limit": "5000" }
+          },
+          {
+            "status": 200,
+            "headers": { "x-ratelimit-remaining": "4999", "x-ratelimit-reset": "7200", "x-ratelimit-limit": "5000" }
+          }
+        ]
+      },
+      "expect": {
+        "outcome": "success",
+        "attempts": 2,
+        "sleeps": [3601000],
+        "finalStatus": { "core": { "remaining": 4999 } }
+      }
+    },
+    {
+      "id": "R6-007",
+      "requirements": ["R6"],
+      "title": "An in-flight wait can be cancelled and unwinds promptly",
+      "kind": "cancellation",
+      "input": {
+        "config": { "maxWaitMs": 600000, "maxRetries": 3 },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          {
+            "status": 403,
+            "headers": { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "300", "x-ratelimit-limit": "5000" }
+          }
+        ],
+        "abortDuringWait": true
+      },
+      "expect": { "outcome": "aborted" }
+    },
+    {
+      "id": "R6-008",
+      "requirements": ["R6"],
+      "title": "A reset-derived wait is computed on GitHub's clock, learned from the Date header",
+      "kind": "scenario",
+      "input": {
+        "config": { "maxRetries": 1, "backoff": { "jitter": "none", "baseMs": 0 } },
+        "startTimeMs": 1445412485000,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          {
+            "status": 403,
+            "headers": {
+              "x-ratelimit-limit": "5000",
+              "x-ratelimit-remaining": "0",
+              "x-ratelimit-reset": "1445412510",
+              "date": "Wed, 21 Oct 2015 07:28:00 GMT"
+            }
+          },
+          {
+            "status": 200,
+            "headers": {
+              "x-ratelimit-limit": "5000",
+              "x-ratelimit-remaining": "4999",
+              "x-ratelimit-reset": "1445416110"
+            }
+          }
+        ]
+      },
+      "expect": { "outcome": "success", "attempts": 2, "sleeps": [31000] }
+    }
+  ]
+}

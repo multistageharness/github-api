@@ -1,0 +1,285 @@
+{
+  "file": "r7-pacing",
+  "description": "R7 — requests are paced before they are sent, adapting to the remaining budget. When the budget is healthy and no wait is owed, pacing adds nothing at all.",
+  "cases": [
+    {
+      "id": "R7-001",
+      "requirements": ["R7"],
+      "title": "A healthy budget with no prior request adds no delay",
+      "kind": "pace",
+      "input": {
+        "state": { "resource": "core", "limit": 5000, "remaining": 5000, "reset": 3600 },
+        "lastRequestAtMs": null,
+        "nowMs": 0,
+        "config": { "minIntervalMs": 0, "adaptive": true, "adaptiveThreshold": 0.2, "reserve": 1, "maxDelayMs": 5000 }
+      },
+      "expect": { "delayMs": 0 }
+    },
+    {
+      "id": "R7-002",
+      "requirements": ["R7"],
+      "title": "The configured minimum interval is enforced per resource",
+      "kind": "pace",
+      "input": {
+        "state": null,
+        "lastRequestAtMs": 0,
+        "nowMs": 40,
+        "config": { "minIntervalMs": 100, "adaptive": true, "adaptiveThreshold": 0.2, "reserve": 1, "maxDelayMs": 5000 }
+      },
+      "expect": { "delayMs": 60, "reason": "min-interval" }
+    },
+    {
+      "id": "R7-003",
+      "requirements": ["R7"],
+      "title": "An interval already elapsed owes nothing",
+      "kind": "pace",
+      "input": {
+        "state": null,
+        "lastRequestAtMs": 0,
+        "nowMs": 500,
+        "config": { "minIntervalMs": 100, "adaptive": true, "adaptiveThreshold": 0.2, "reserve": 1, "maxDelayMs": 5000 }
+      },
+      "expect": { "delayMs": 0 }
+    },
+    {
+      "id": "R7-004",
+      "requirements": ["R7"],
+      "title": "A nearly-exhausted budget is spread across the rest of its window",
+      "kind": "pace",
+      "input": {
+        "state": { "resource": "core", "limit": 5000, "remaining": 101, "reset": 3600 },
+        "lastRequestAtMs": null,
+        "nowMs": 0,
+        "config": { "minIntervalMs": 0, "adaptive": true, "adaptiveThreshold": 0.2, "reserve": 1, "maxDelayMs": 60000 }
+      },
+      "expect": { "delayMs": 36000, "reason": "adaptive" }
+    },
+    {
+      "id": "R7-005",
+      "requirements": ["R7"],
+      "title": "Above the threshold the budget is healthy and adaptive pacing stays off",
+      "kind": "pace",
+      "input": {
+        "state": { "resource": "core", "limit": 5000, "remaining": 2000, "reset": 3600 },
+        "lastRequestAtMs": null,
+        "nowMs": 0,
+        "config": { "minIntervalMs": 0, "adaptive": true, "adaptiveThreshold": 0.2, "reserve": 1, "maxDelayMs": 60000 }
+      },
+      "expect": { "delayMs": 0 }
+    },
+    {
+      "id": "R7-006",
+      "requirements": ["R7"],
+      "title": "Without a reported limit there is no ratio to test, so no limit is invented",
+      "kind": "pace",
+      "input": {
+        "state": { "resource": "core", "remaining": 10, "reset": 3600 },
+        "lastRequestAtMs": null,
+        "nowMs": 0,
+        "config": { "minIntervalMs": 0, "adaptive": true, "adaptiveThreshold": 0.2, "reserve": 1, "maxDelayMs": 60000 }
+      },
+      "expect": { "delayMs": 0 }
+    },
+    {
+      "id": "R7-007",
+      "requirements": ["R7"],
+      "title": "A budget spent down to the reserve paces at the ceiling",
+      "kind": "pace",
+      "input": {
+        "state": { "resource": "core", "limit": 5000, "remaining": 1, "reset": 3600 },
+        "lastRequestAtMs": null,
+        "nowMs": 0,
+        "config": { "minIntervalMs": 0, "adaptive": true, "adaptiveThreshold": 0.2, "reserve": 1, "maxDelayMs": 5000 }
+      },
+      "expect": { "delayMs": 5000, "reason": "adaptive" }
+    },
+    {
+      "id": "R7-008",
+      "requirements": ["R7", "R12"],
+      "title": "Adaptive pacing can be switched off by configuration",
+      "kind": "pace",
+      "input": {
+        "state": { "resource": "core", "limit": 5000, "remaining": 101, "reset": 3600 },
+        "lastRequestAtMs": null,
+        "nowMs": 0,
+        "config": { "minIntervalMs": 0, "adaptive": false, "adaptiveThreshold": 0.2, "reserve": 1, "maxDelayMs": 60000 }
+      },
+      "expect": { "delayMs": 0 }
+    },
+    {
+      "id": "R7-009",
+      "requirements": ["R7", "R6"],
+      "title": "A clock that jumped backwards does not manufacture a huge delay",
+      "kind": "pace",
+      "input": {
+        "state": null,
+        "lastRequestAtMs": 1000,
+        "nowMs": 0,
+        "config": { "minIntervalMs": 100, "adaptive": true, "adaptiveThreshold": 0.2, "reserve": 1, "maxDelayMs": 5000 }
+      },
+      "expect": { "delayMs": 0 }
+    },
+    {
+      "id": "R7-010",
+      "requirements": ["R7"],
+      "title": "A window that has already rolled over owes no adaptive delay",
+      "kind": "pace",
+      "input": {
+        "state": { "resource": "core", "limit": 5000, "remaining": 1, "reset": 100 },
+        "lastRequestAtMs": null,
+        "nowMs": 200000,
+        "config": { "minIntervalMs": 0, "adaptive": true, "adaptiveThreshold": 0.2, "reserve": 1, "maxDelayMs": 5000 }
+      },
+      "expect": { "delayMs": 0 }
+    },
+    {
+      "id": "R7-011",
+      "requirements": ["R7"],
+      "title": "The larger of the two delays wins",
+      "kind": "pace",
+      "input": {
+        "state": { "resource": "core", "limit": 5000, "remaining": 101, "reset": 3600 },
+        "lastRequestAtMs": 0,
+        "nowMs": 0,
+        "config": { "minIntervalMs": 100, "adaptive": true, "adaptiveThreshold": 0.2, "reserve": 1, "maxDelayMs": 60000 }
+      },
+      "expect": { "delayMs": 36000, "reason": "adaptive" }
+    },
+    {
+      "id": "R7-012",
+      "requirements": ["R7"],
+      "title": "A second request to the same resource waits out the minimum interval",
+      "kind": "scenario",
+      "input": {
+        "config": { "minIntervalMs": 5000, "maxRetries": 0 },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "repeat": 2,
+        "responses": [
+          {
+            "status": 200,
+            "headers": { "x-ratelimit-remaining": "4999", "x-ratelimit-reset": "3600", "x-ratelimit-limit": "5000" }
+          },
+          {
+            "status": 200,
+            "headers": { "x-ratelimit-remaining": "4998", "x-ratelimit-reset": "3600", "x-ratelimit-limit": "5000" }
+          }
+        ]
+      },
+      "expect": {
+        "outcome": "success",
+        "attempts": 2,
+        "sleeps": [5000],
+        "events": ["throttle"]
+      }
+    },
+    {
+      "id": "R7-013",
+      "requirements": ["R7", "R12"],
+      "title": "Pacing is skippable per request for a latency-critical call",
+      "kind": "scenario",
+      "input": {
+        "config": { "minIntervalMs": 5000, "maxRetries": 0 },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET", "skipPacing": true },
+        "repeat": 2,
+        "responses": [
+          {
+            "status": 200,
+            "headers": { "x-ratelimit-remaining": "4999", "x-ratelimit-reset": "3600", "x-ratelimit-limit": "5000" }
+          },
+          {
+            "status": 200,
+            "headers": { "x-ratelimit-remaining": "4998", "x-ratelimit-reset": "3600", "x-ratelimit-limit": "5000" }
+          }
+        ]
+      },
+      "expect": { "outcome": "success", "attempts": 2, "sleeps": [] }
+    },
+    {
+      "id": "R7-014",
+      "requirements": ["R7", "R2"],
+      "title": "Pacing one bucket never delays another",
+      "kind": "scenario",
+      "input": {
+        "config": { "minIntervalMs": 5000, "maxRetries": 0 },
+        "startTimeMs": 0,
+        "requests": [
+          { "url": "/repos/o/r", "method": "GET" },
+          { "url": "/search/repositories?q=x", "method": "GET" }
+        ],
+        "responses": [
+          {
+            "status": 200,
+            "headers": { "x-ratelimit-remaining": "4999", "x-ratelimit-reset": "3600", "x-ratelimit-limit": "5000", "x-ratelimit-resource": "core" }
+          },
+          {
+            "status": 200,
+            "headers": { "x-ratelimit-remaining": "29", "x-ratelimit-reset": "60", "x-ratelimit-limit": "30", "x-ratelimit-resource": "search" }
+          }
+        ]
+      },
+      "expect": { "outcome": "success", "attempts": 2, "sleeps": [] }
+    },
+    {
+      "id": "R7-015",
+      "requirements": ["R7", "R2"],
+      "title": "Code search is paced against its own budget, not search's",
+      "kind": "scenario",
+      "input": {
+        "config": { "maxRetries": 0 },
+        "startTimeMs": 0,
+        "request": { "url": "/search/code?q=fetch", "method": "GET" },
+        "repeat": 2,
+        "responses": [
+          {
+            "status": 200,
+            "headers": {
+              "x-ratelimit-resource": "code_search",
+              "x-ratelimit-limit": "10",
+              "x-ratelimit-remaining": "1",
+              "x-ratelimit-reset": "60"
+            }
+          },
+          {
+            "status": 200,
+            "headers": {
+              "x-ratelimit-resource": "code_search",
+              "x-ratelimit-limit": "10",
+              "x-ratelimit-remaining": "0",
+              "x-ratelimit-reset": "60"
+            }
+          }
+        ]
+      },
+      "expect": {
+        "outcome": "success",
+        "attempts": 2,
+        "sleeps": [5000],
+        "events": ["throttle"],
+        "finalStatus": { "code_search": { "remaining": 0 }, "search": { "remaining": null } }
+      }
+    },
+    {
+      "id": "R7-016",
+      "requirements": ["R7", "R8"],
+      "title": "Concurrent callers are spaced by the minimum interval, not released together",
+      "kind": "concurrent-scenario",
+      "input": {
+        "config": { "minIntervalMs": 300, "maxRetries": 0 },
+        "startTimeMs": 0,
+        "requests": [
+          { "url": "/repos/o/r", "method": "GET", "responses": [{ "status": 200, "headers": {} }] },
+          { "url": "/repos/o/r", "method": "GET", "responses": [{ "status": 200, "headers": {} }] },
+          { "url": "/repos/o/r", "method": "GET", "responses": [{ "status": 200, "headers": {} }] }
+        ]
+      },
+      "expect": {
+        "outcomes": ["success", "success", "success"],
+        "attempts": 3,
+        "sendTimes": [[0], [300], [600]],
+        "sleeps": [300, 600]
+      }
+    }
+  ]
+}

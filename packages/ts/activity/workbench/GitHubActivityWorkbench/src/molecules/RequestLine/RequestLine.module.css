@@ -1,0 +1,68 @@
+.card {
+  background: #0f172a;
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+}
+
+.rose {
+  background: #fb7185;
+}
+
+.amber {
+  background: #fbbf24;
+}
+
+.emerald {
+  background: #34d399;
+}
+
+.headerLabel {
+  margin-left: 0.375rem;
+  font-size: 0.625rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.body {
+  padding: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+
+.method {
+  color: #34d399;
+  font-weight: 700;
+}
+
+.path {
+  color: #e2e8f0;
+}
+
+.qs {
+  color: #a5b4fc;
+}
+
+.muted {
+  color: #64748b;
+}
+
+.accept {
+  color: #fbbf24;
+}

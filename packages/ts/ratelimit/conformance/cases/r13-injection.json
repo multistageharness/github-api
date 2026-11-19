@@ -1,0 +1,124 @@
+{
+  "file": "r13-injection",
+  "description": "R13 — the clock is supplied by the caller, so hour-long waits are exercised without hour-long tests, and the package governs whatever transport it is handed rather than dictating one.",
+  "cases": [
+    {
+      "id": "R13-001",
+      "requirements": ["R13", "R6"],
+      "title": "An hour-long wait is exercised without an hour of elapsed time",
+      "kind": "scenario",
+      "input": {
+        "config": {
+          "maxWaitMs": 7200000,
+          "maxRetries": 1,
+          "backoff": { "jitter": "none", "baseMs": 0 }
+        },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          {
+            "status": 403,
+            "headers": { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "3600", "x-ratelimit-limit": "5000" }
+          },
+          {
+            "status": 200,
+            "headers": { "x-ratelimit-remaining": "4999", "x-ratelimit-reset": "7200", "x-ratelimit-limit": "5000" }
+          }
+        ]
+      },
+      "expect": {
+        "outcome": "success",
+        "attempts": 2,
+        "sleeps": [3601000],
+        "elapsedMs": 3601000
+      }
+    },
+    {
+      "id": "R13-002",
+      "requirements": ["R13"],
+      "title": "The injected clock is the only source of time — none is read from the host",
+      "kind": "scenario",
+      "input": {
+        "config": { "maxRetries": 1, "maxWaitMs": 600000, "backoff": { "jitter": "none", "baseMs": 0 } },
+        "startTimeMs": 1700000000000,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          { "status": 429, "headers": { "retry-after": "30" } },
+          {
+            "status": 200,
+            "headers": { "x-ratelimit-remaining": "4999", "x-ratelimit-reset": "1700003600", "x-ratelimit-limit": "5000" }
+          }
+        ]
+      },
+      "expect": { "outcome": "success", "attempts": 2, "sleeps": [30000], "elapsedMs": 30000 }
+    },
+    {
+      "id": "R13-003",
+      "requirements": ["R13", "R9"],
+      "title": "The random source is injected, so a jittered schedule is still deterministic",
+      "kind": "scenario",
+      "input": {
+        "config": {
+          "maxRetries": 1,
+          "maxWaitMs": 600000,
+          "backoff": { "jitter": "equal", "baseMs": 1000, "factor": 2, "maxMs": 30000 }
+        },
+        "randomSequence": [0.5],
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          { "status": 429, "headers": { "retry-after": "2" } },
+          {
+            "status": 200,
+            "headers": { "x-ratelimit-remaining": "4999", "x-ratelimit-reset": "3600", "x-ratelimit-limit": "5000" }
+          }
+        ]
+      },
+      "expect": { "outcome": "success", "attempts": 2, "sleeps": [2000, 750] }
+    },
+    {
+      "id": "R13-004",
+      "requirements": ["R13"],
+      "title": "A transport that returns its error response is governed identically to one that throws",
+      "kind": "scenario",
+      "input": {
+        "config": { "maxRetries": 1, "maxWaitMs": 600000, "backoff": { "jitter": "none", "baseMs": 0 } },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          {
+            "status": 403,
+            "headers": { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "60", "x-ratelimit-limit": "5000" }
+          },
+          {
+            "status": 200,
+            "headers": { "x-ratelimit-remaining": "4999", "x-ratelimit-reset": "3660", "x-ratelimit-limit": "5000" }
+          }
+        ]
+      },
+      "expect": { "outcome": "success", "attempts": 2, "sleeps": [61000] }
+    },
+    {
+      "id": "R13-005",
+      "requirements": ["R13"],
+      "title": "A transport that throws its error response is governed identically to one that returns",
+      "kind": "scenario",
+      "input": {
+        "config": { "maxRetries": 1, "maxWaitMs": 600000, "backoff": { "jitter": "none", "baseMs": 0 } },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          {
+            "throwStatus": 403,
+            "headers": { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "60", "x-ratelimit-limit": "5000" }
+          },
+          {
+            "status": 200,
+            "headers": { "x-ratelimit-remaining": "4999", "x-ratelimit-reset": "3660", "x-ratelimit-limit": "5000" }
+          }
+        ]
+      },
+      "expect": { "outcome": "success", "attempts": 2, "sleeps": [61000] }
+    }
+  ]
+}

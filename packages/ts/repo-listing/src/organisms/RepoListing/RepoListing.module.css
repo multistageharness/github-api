@@ -1,0 +1,41 @@
+/* No viewport height, page background or outer padding: the host decides
+   the page chrome (see dev/styles.css), so the organism embeds in a card or
+   panel. Pass `className` to add spacing or a background. */
+.root {
+  color: #0f172a;
+}
+
+.inner {
+  margin: 0 auto;
+  max-width: 72rem;
+}
+
+.grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+.gridItem {
+  display: flex;
+  flex-direction: column;
+}
+
+.gridItem > * {
+  flex: 1;
+}
+
+@media (min-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

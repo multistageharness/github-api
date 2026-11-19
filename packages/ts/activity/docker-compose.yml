@@ -1,0 +1,22 @@
+# GitHub Activity — local dev compose.
+#
+# Currently runs the GitHubActivityWorkbench dev harness (the atomic-design
+# organism under ./workbench). `make compose-up` from this directory starts it.
+services:
+  workbench:
+    build:
+      context: ./workbench/GitHubActivityWorkbench
+      dockerfile: Dockerfile
+    image: github-activity-workbench:dev
+    container_name: github-activity-workbench
+    ports:
+      - "5217:5217"
+    # Live-reload the source without rebuilding the image; the named volume keeps
+    # the container's own node_modules (so the host's are not shadowed).
+    volumes:
+      - ./workbench/GitHubActivityWorkbench:/app
+      - workbench_node_modules:/app/node_modules
+    restart: unless-stopped
+
+volumes:
+  workbench_node_modules:

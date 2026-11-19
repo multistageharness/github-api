@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    // The CommonJS pass resolves with `Node10`, which ignores package.json
+    // `exports`, so the search SDK's `./endpoints` and `./utils` subpath exports
+    // cannot be found. Map them to the SDK's own CJS declarations for type
+    // checking only; the emitted `require('@internal/github-sdk-search/utils')`
+    // is unchanged and resolved by Node through `exports` at runtime.
+    "paths": {
+      "@internal/github-sdk-search/*": ["../node_modules/@internal/github-sdk-search/dist/cjs/*/index"]
+    }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "name": "@internal/github-sdk-fetch-proxy",
+  "version": "0.0.1",
+  "description": "Opt-in HTTP-proxy support for the GitHub fetch layer — the one package that owns an HTTP stack, so the three fetch packages keep their dependency lists (PRD 0002, D1). Import it once and every client honors `proxy`, GITHUB_PROXY / HTTPS_PROXY and NO_PROXY.",
+  "type": "module",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json --module NodeNext --moduleResolution NodeNext --outDir dist/esm && tsc -p tsconfig.build.json --module CommonJS --moduleResolution Node10 --outDir dist/cjs && node ../scripts/fixup-dist.mjs .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "keywords": [
+    "github",
+    "api",
+    "proxy",
+    "https-proxy",
+    "no-proxy",
+    "undici",
+    "fetch",
+    "sdk"
+  ],
+  "author": "GitHub API Module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "dependencies": {
+    "@internal/github-sdk-fetch-rest-api": "^0.0.1",
+    "undici": "^6.21.1"
+  },
+  "devDependencies": {
+    "commander": "^11.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ]
+}

@@ -1,0 +1,178 @@
+{
+  "file": "r1-tracking",
+  "description": "R1 — rate-limit state is recorded from every response, and a header that is missing or unparseable is treated as absent rather than as a budget of zero.",
+  "cases": [
+    {
+      "id": "R1-001",
+      "requirements": ["R1"],
+      "title": "All five rate-limit headers are read",
+      "kind": "parse-headers",
+      "input": {
+        "headers": {
+          "x-ratelimit-limit": "5000",
+          "x-ratelimit-remaining": "4999",
+          "x-ratelimit-reset": "3600",
+          "x-ratelimit-used": "1",
+          "x-ratelimit-resource": "core"
+        },
+        "fallbackResource": "core"
+      },
+      "expect": { "limit": 5000, "remaining": 4999, "reset": 3600, "used": 1, "resource": "core" }
+    },
+    {
+      "id": "R1-002",
+      "requirements": ["R1"],
+      "title": "A response with no rate-limit headers reports nothing, not zero",
+      "kind": "parse-headers",
+      "input": {
+        "headers": { "content-type": "application/json" },
+        "fallbackResource": "core"
+      },
+      "expect": { "limit": null, "remaining": null, "reset": null, "used": null, "resource": "core" }
+    },
+    {
+      "id": "R1-003",
+      "requirements": ["R1"],
+      "title": "Empty, whitespace and non-numeric headers are absent, not zero",
+      "kind": "parse-headers",
+      "input": {
+        "headers": {
+          "x-ratelimit-limit": "",
+          "x-ratelimit-remaining": "abc",
+          "x-ratelimit-reset": "   ",
+          "x-ratelimit-used": "1.5"
+        },
+        "fallbackResource": "core"
+      },
+      "expect": { "limit": null, "remaining": null, "reset": null, "used": null }
+    },
+    {
+      "id": "R1-004",
+      "requirements": ["R1"],
+      "title": "A genuine zero is preserved and is distinguishable from absent",
+      "kind": "parse-headers",
+      "input": {
+        "headers": { "x-ratelimit-remaining": "0" },
+        "fallbackResource": "core"
+      },
+      "expect": { "limit": null, "remaining": 0, "reset": null, "used": null }
+    },
+    {
+      "id": "R1-005",
+      "requirements": ["R1"],
+      "title": "Header names are matched case-insensitively",
+      "kind": "parse-headers",
+      "input": {
+        "headers": { "X-RateLimit-Limit": "5000", "X-RATELIMIT-REMAINING": "4999" },
+        "fallbackResource": "core"
+      },
+      "expect": { "limit": 5000, "remaining": 4999 }
+    },
+    {
+      "id": "R1-006",
+      "requirements": ["R1"],
+      "title": "A negative count is nonsense and is treated as absent",
+      "kind": "parse-headers",
+      "input": {
+        "headers": { "x-ratelimit-remaining": "-1" },
+        "fallbackResource": "core"
+      },
+      "expect": { "remaining": null }
+    },
+    {
+      "id": "R1-007",
+      "requirements": ["R1"],
+      "title": "A later response carrying no headers leaves prior state untouched",
+      "kind": "store",
+      "input": {
+        "observations": [
+          {
+            "headers": {
+              "x-ratelimit-limit": "5000",
+              "x-ratelimit-remaining": "4999",
+              "x-ratelimit-reset": "3600",
+              "x-ratelimit-resource": "core"
+            },
+            "fallbackResource": "core",
+            "atMs": 0
+          },
+          { "headers": { "content-type": "application/json" }, "fallbackResource": "core", "atMs": 1000 }
+        ],
+        "nowMs": 1000
+      },
+      "expect": { "statuses": { "core": { "limit": 5000, "remaining": 4999, "reset": 3600 } } }
+    },
+    {
+      "id": "R1-008",
+      "requirements": ["R1"],
+      "title": "A partial response updates only the fields it carried",
+      "kind": "store",
+      "input": {
+        "observations": [
+          {
+            "headers": {
+              "x-ratelimit-limit": "5000",
+              "x-ratelimit-remaining": "4999",
+              "x-ratelimit-reset": "3600",
+              "x-ratelimit-used": "1",
+              "x-ratelimit-resource": "core"
+            },
+            "fallbackResource": "core",
+            "atMs": 0
+          },
+          {
+            "headers": { "x-ratelimit-remaining": "4998", "x-ratelimit-resource": "core" },
+            "fallbackResource": "core",
+            "atMs": 1000
+          }
+        ],
+        "nowMs": 1000
+      },
+      "expect": { "statuses": { "core": { "limit": 5000, "remaining": 4998, "reset": 3600, "used": 1 } } }
+    },
+    {
+      "id": "R1-009",
+      "requirements": ["R1", "R10"],
+      "title": "State is readable without issuing a request",
+      "kind": "store",
+      "input": { "observations": [], "nowMs": 0 },
+      "expect": { "statuses": { "core": { "limit": null, "remaining": null, "exhausted": false } } }
+    },
+    {
+      "id": "R1-010",
+      "requirements": ["R1"],
+      "title": "State is recorded even when the response is an error",
+      "kind": "scenario",
+      "input": {
+        "config": { "maxRetries": 0 },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          {
+            "throwStatus": 404,
+            "headers": {
+              "x-ratelimit-limit": "5000",
+              "x-ratelimit-remaining": "4321",
+              "x-ratelimit-reset": "3600",
+              "x-ratelimit-resource": "core"
+            }
+          }
+        ]
+      },
+      "expect": {
+        "outcome": "error",
+        "attempts": 1,
+        "sleeps": [],
+        "finalStatus": { "core": { "remaining": 4321, "limit": 5000 } }
+      }
+    },
+    {
+      "id": "R1-011",
+      "requirements": ["R1"],
+      "title": "Non-ASCII digits are not a number — a budget is never read from them",
+      "kind": "parse-headers",
+      "input": { "headers": { "x-ratelimit-limit": "５０", "x-ratelimit-remaining": "١٢" }, "fallbackResource": "core" },
+      "expect": { "limit": null, "remaining": null, "used": null, "reset": null, "resource": "core" }
+    }
+  ]
+}

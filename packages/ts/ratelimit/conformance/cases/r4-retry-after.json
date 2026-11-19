@@ -1,0 +1,226 @@
+{
+  "file": "r4-retry-after",
+  "description": "R4 — Retry-After is GitHub's explicit instruction and takes precedence over any locally computed delay. Nothing in the repository read this header before this package.",
+  "cases": [
+    {
+      "id": "R4-001",
+      "requirements": ["R4"],
+      "title": "Retry-After in delay-seconds form",
+      "kind": "parse-retry-after",
+      "input": { "value": "120", "nowMs": 1700000000000 },
+      "expect": { "ms": 120000 }
+    },
+    {
+      "id": "R4-002",
+      "requirements": ["R4"],
+      "title": "Retry-After of zero means retry immediately, and is not 'absent'",
+      "kind": "parse-retry-after",
+      "input": { "value": "0", "nowMs": 1700000000000 },
+      "expect": { "ms": 0 }
+    },
+    {
+      "id": "R4-003",
+      "requirements": ["R4"],
+      "title": "Retry-After in HTTP-date form",
+      "kind": "parse-retry-after",
+      "input": { "value": "Wed, 21 Oct 2015 07:28:00 GMT", "nowMs": 1445412000000 },
+      "expect": { "ms": 480000 }
+    },
+    {
+      "id": "R4-004",
+      "requirements": ["R4", "R6"],
+      "title": "An HTTP-date already in the past yields zero, never a negative wait",
+      "kind": "parse-retry-after",
+      "input": { "value": "Wed, 21 Oct 2015 07:28:00 GMT", "nowMs": 1445413000000 },
+      "expect": { "ms": 0 }
+    },
+    {
+      "id": "R4-005",
+      "requirements": ["R4"],
+      "title": "A malformed Retry-After is absent, so the caller falls back rather than failing",
+      "kind": "parse-retry-after",
+      "input": { "value": "not-a-date", "nowMs": 1700000000000 },
+      "expect": { "ms": null }
+    },
+    {
+      "id": "R4-006",
+      "requirements": ["R4"],
+      "title": "An empty Retry-After is absent",
+      "kind": "parse-retry-after",
+      "input": { "value": "", "nowMs": 1700000000000 },
+      "expect": { "ms": null }
+    },
+    {
+      "id": "R4-007",
+      "requirements": ["R4"],
+      "title": "No Retry-After header at all",
+      "kind": "parse-retry-after",
+      "input": { "value": null, "nowMs": 1700000000000 },
+      "expect": { "ms": null }
+    },
+    {
+      "id": "R4-008",
+      "requirements": ["R4"],
+      "title": "Retry-After is read on a 403",
+      "kind": "classify",
+      "input": {
+        "status": 403,
+        "headers": { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "3600", "retry-after": "30" },
+        "data": null,
+        "nowMs": 0,
+        "resourceHint": "core"
+      },
+      "expect": { "kind": "primary", "isRateLimit": true, "retryAfterMs": 30000, "resetAtMs": 3600000 }
+    },
+    {
+      "id": "R4-009",
+      "requirements": ["R4"],
+      "title": "Retry-After is read on a 429",
+      "kind": "classify",
+      "input": {
+        "status": 429,
+        "headers": { "retry-after": "45" },
+        "data": null,
+        "nowMs": 0,
+        "resourceHint": "core"
+      },
+      "expect": { "kind": "secondary", "isRateLimit": true, "retryAfterMs": 45000 }
+    },
+    {
+      "id": "R4-010",
+      "requirements": ["R4"],
+      "title": "Retry-After overrides the delay derived from x-ratelimit-reset",
+      "kind": "wait",
+      "input": {
+        "classification": { "kind": "primary", "retryAfterMs": 30000, "resetAtMs": 3600000 },
+        "nowMs": 0,
+        "maxWaitMs": 600000,
+        "paddingMs": 1000,
+        "fallbackMs": 1000,
+        "secondaryStreak": 0,
+        "secondaryEscalationFactor": 2
+      },
+      "expect": { "waitMs": 30000, "requestedMs": 30000, "exceedsCeiling": false, "retryAfterUsed": true }
+    },
+    {
+      "id": "R4-011",
+      "requirements": ["R4"],
+      "title": "With no Retry-After the reset timestamp decides the wait",
+      "kind": "wait",
+      "input": {
+        "classification": { "kind": "primary", "retryAfterMs": null, "resetAtMs": 10000 },
+        "nowMs": 0,
+        "maxWaitMs": 600000,
+        "paddingMs": 1000,
+        "fallbackMs": 1000,
+        "secondaryStreak": 0,
+        "secondaryEscalationFactor": 2
+      },
+      "expect": { "waitMs": 11000, "requestedMs": 11000, "exceedsCeiling": false, "retryAfterUsed": false }
+    },
+    {
+      "id": "R4-012",
+      "requirements": ["R4", "R6"],
+      "title": "A Retry-After longer than the ceiling is still bounded by it",
+      "kind": "wait",
+      "input": {
+        "classification": { "kind": "primary", "retryAfterMs": 3600000, "resetAtMs": null },
+        "nowMs": 0,
+        "maxWaitMs": 60000,
+        "paddingMs": 1000,
+        "fallbackMs": 1000,
+        "secondaryStreak": 0,
+        "secondaryEscalationFactor": 2
+      },
+      "expect": { "waitMs": 60000, "requestedMs": 3600000, "exceedsCeiling": true, "retryAfterUsed": true }
+    },
+    {
+      "id": "R4-013",
+      "requirements": ["R4", "R9"],
+      "title": "A 429 carrying Retry-After is waited exactly that long and then replayed",
+      "kind": "scenario",
+      "input": {
+        "config": { "maxRetries": 1, "maxWaitMs": 600000, "backoff": { "jitter": "none", "baseMs": 0 } },
+        "startTimeMs": 0,
+        "request": { "url": "/repos/o/r", "method": "GET" },
+        "responses": [
+          { "status": 429, "headers": { "retry-after": "30" } },
+          {
+            "status": 200,
+            "headers": { "x-ratelimit-remaining": "4999", "x-ratelimit-reset": "3600", "x-ratelimit-limit": "5000" }
+          }
+        ]
+      },
+      "expect": {
+        "outcome": "success",
+        "attempts": 2,
+        "sleeps": [30000],
+        "events": ["limit", "wait", "retry"]
+      }
+    },
+    {
+      "id": "R4-014",
+      "requirements": ["R4"],
+      "title": "An HTTP-date with a numeric zone instead of GMT is not an HTTP-date",
+      "kind": "parse-retry-after",
+      "input": { "value": "Wed, 21 Oct 2015 07:28:00 -0000", "nowMs": 1445412000000 },
+      "expect": { "ms": null }
+    },
+    {
+      "id": "R4-015",
+      "requirements": ["R4"],
+      "title": "An ISO 8601 timestamp is not an HTTP-date",
+      "kind": "parse-retry-after",
+      "input": { "value": "2015-10-21T07:28:00Z", "nowMs": 1445412000000 },
+      "expect": { "ms": null }
+    },
+    {
+      "id": "R4-016",
+      "requirements": ["R4"],
+      "title": "A locale-style date is not an HTTP-date",
+      "kind": "parse-retry-after",
+      "input": { "value": "10/21/2015", "nowMs": 1445412000000 },
+      "expect": { "ms": null }
+    },
+    {
+      "id": "R4-017",
+      "requirements": ["R4"],
+      "title": "A date with no zone is rejected rather than read in the host's timezone",
+      "kind": "parse-retry-after",
+      "input": { "value": "Wed, 21 Oct 2015 07:28:00", "nowMs": 1445412000000 },
+      "expect": { "ms": null }
+    },
+    {
+      "id": "R4-018",
+      "requirements": ["R4"],
+      "title": "The obsolete RFC 850 form is still an HTTP-date",
+      "kind": "parse-retry-after",
+      "input": { "value": "Wednesday, 21-Oct-15 07:28:00 GMT", "nowMs": 1445412000000 },
+      "expect": { "ms": 480000 }
+    },
+    {
+      "id": "R4-019",
+      "requirements": ["R4"],
+      "title": "The obsolete asctime form is still an HTTP-date",
+      "kind": "parse-retry-after",
+      "input": { "value": "Wed Oct 21 07:28:00 2015", "nowMs": 1445412000000 },
+      "expect": { "ms": 480000 }
+    },
+    {
+      "id": "R4-020",
+      "requirements": ["R4"],
+      "title": "A calendar date that does not exist is malformed",
+      "kind": "parse-retry-after",
+      "input": { "value": "Mon, 30 Feb 2015 07:28:00 GMT", "nowMs": 1445412000000 },
+      "expect": { "ms": null }
+    },
+    {
+      "id": "R4-021",
+      "requirements": ["R4"],
+      "title": "Non-ASCII digits are not delay-seconds",
+      "kind": "parse-retry-after",
+      "input": { "value": "٣", "nowMs": 1700000000000 },
+      "expect": { "ms": null }
+    }
+  ]
+}
